@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import datetime
 import math
+import pyotp
 from SmartApi import SmartConnect
 
 # ==========================================
@@ -22,7 +23,7 @@ if 'authenticated' not in st.session_state:
     st.session_state['smart_api'] = None
 
 # ==========================================
-# 3. RUNTIME LOGIN SCREEN
+# 3. RUNTIME LOGIN SCREEN (Auto 6-Digit TOTP)
 # ==========================================
 if not st.session_state['authenticated']:
     st.title("🔐 Shahrukh Algo - Angel One Login")
@@ -35,15 +36,19 @@ if not st.session_state['authenticated']:
             client_code = st.text_input("Client Code (e.g. A123456)")
         with col2:
             password = st.text_input("PIN / Password", type="password")
-            totp = st.text_input("Current 6-Digit TOTP")
+            # यहाँ आपको अपना लंबा वाला TOTP Secret डालना है
+            totp_secret = st.text_input("Long TOTP Secret Key", type="password", help="अपना लंबा वाला TOTP सीक्रेट यहाँ डालें")
 
         submit = st.form_submit_button("🚀 Login & Start Live Scanner")
 
         if submit:
-            if api_key and client_code and password and totp:
+            if api_key and client_code and password and totp_secret:
                 try:
+                    # pyotp आपके लंबे सीक्रेट से लाइव 6-अंकीय कोड बनाएगा
+                    current_6_digit_totp = pyotp.TOTP(totp_secret).now()
+                    
                     smartApi = SmartConnect(api_key=api_key)
-                    auth_data = smartApi.generateSession(client_code, password, totp)
+                    auth_data = smartApi.generateSession(client_code, password, current_6_digit_totp)
                     
                     if auth_data.get('status') == True:
                         st.session_state['authenticated'] = True
@@ -96,9 +101,8 @@ else:
     st.markdown("---")
 
     # ------------------------------------------
-    # SHAHRUKH ALGO LIVE SIGNALS DATA (SAMPLE / LIVE ENGINE)
+    # SHAHRUKH ALGO LIVE SIGNALS DATA (MOCK LIVE DATA)
     # ------------------------------------------
-    # नोट: बैकएंड में Nifty 750 फिल्टर होने के बाद आए हुए स्टॉक्स
     raw_signals_data = [
         {
             "Symbol": "SUZLON",
@@ -162,10 +166,6 @@ else:
         # 1. Price Range Check (₹50 to ₹900)
         if 50 <= ltp <= 900:
             # 2. Shahrukh Algo Conditions Check
-            # - Close > ORB High
-            # - Close > VWAP & Close > 10 EMA
-            # - RVOL >= 1.5
-            # - Gap < 3%
             if (ltp > item["15M_ORB_High"]) and (ltp > item["VWAP"]) and (ltp > item["EMA_10"]) and (item["RVOL"] >= 1.5) and (abs(item["Gap_Pct"]) < 3.0):
                 
                 # 3. Dynamic Leverage Quantity Calculation (5x Buying Power)
@@ -185,7 +185,7 @@ else:
                         "Required Margin": f"₹ {margin_used:,}",
                         "Stop Loss (₹)": sl,
                         "Target (1:1.5)": target_price,
-                        "Max Risk (SL Hits)": f"₹ {max_risk_amt:,}",
+                        "Max Risk (SL)": f"₹ {max_risk_amt:,}",
                         "RVOL": f"{item['RVOL']}x",
                         "TradingView Link": f"https://in.tradingview.com/chart/?symbol=NSE:{item['Symbol']}"
                     })
